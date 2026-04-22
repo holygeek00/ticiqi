@@ -80,6 +80,7 @@ function App() {
   const [editorTab, setEditorTab] = useState('editor')
   const containerRef = useRef(null)
   const markdownInputRef = useRef(null)
+  const autoScrollTimerRef = useRef(null)
 
   useEffect(() => {
     try {
@@ -131,26 +132,41 @@ function App() {
   }, [isEditing])
 
   useEffect(() => {
-    if (isEditing || !isAutoScrolling) return undefined
-
-    let rafId = 0
-    const step = () => {
-      const el = containerRef.current
-      if (el) {
-        const maxTop = el.scrollHeight - el.clientHeight
-        if (el.scrollTop < maxTop) {
-          el.scrollTop += scrollSpeed
-          rafId = window.requestAnimationFrame(step)
-        } else {
-          setIsAutoScrolling(false)
-        }
-      } else {
-        rafId = window.requestAnimationFrame(step)
-      }
+    if (autoScrollTimerRef.current) {
+      window.clearInterval(autoScrollTimerRef.current)
+      autoScrollTimerRef.current = null
     }
 
-    rafId = window.requestAnimationFrame(step)
-    return () => window.cancelAnimationFrame(rafId)
+    if (isEditing || !isAutoScrolling) return undefined
+
+    const el = containerRef.current
+    if (!el) return undefined
+
+    const maxTop = el.scrollHeight - el.clientHeight
+    if (maxTop <= 0) {
+      setIsAutoScrolling(false)
+      setSaveStatus('当前内容不足以滚动')
+      return undefined
+    }
+
+    autoScrollTimerRef.current = window.setInterval(() => {
+      const node = containerRef.current
+      if (!node) return
+
+      const maxScrollTop = node.scrollHeight - node.clientHeight
+      if (node.scrollTop >= maxScrollTop - 1) {
+        setIsAutoScrolling(false)
+        return
+      }
+      node.scrollBy({ top: scrollSpeed, behavior: 'auto' })
+    }, 16)
+
+    return () => {
+      if (autoScrollTimerRef.current) {
+        window.clearInterval(autoScrollTimerRef.current)
+        autoScrollTimerRef.current = null
+      }
+    }
   }, [isAutoScrolling, isEditing, scrollSpeed])
 
   const handleStart = () => {
