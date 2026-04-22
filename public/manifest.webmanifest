@@ -1,0 +1,19 @@
+{
+  "name": "提词器",
+  "short_name": "提词器",
+  "description": "简洁可安装的提词器应用，支持字体调节、镜像和横竖屏。",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
