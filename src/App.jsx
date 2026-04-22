@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Edit2, FlipHorizontal, Pause, Play, Smartphone, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { Edit2, FlipHorizontal, Play, Smartphone, X, ZoomIn, ZoomOut } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import './App.css'
@@ -72,15 +72,12 @@ function App() {
   const [isMirrored, setIsMirrored] = useState(false)
   const [showControls, setShowControls] = useState(true)
   const [isRotated, setIsRotated] = useState(false)
-  const [isAutoScrolling, setIsAutoScrolling] = useState(false)
-  const [scrollSpeed, setScrollSpeed] = useState(1.5)
   const [saveStatus, setSaveStatus] = useState('')
   const [importedCards, setImportedCards] = useState([])
   const [activeCardId, setActiveCardId] = useState('')
   const [editorTab, setEditorTab] = useState('editor')
   const containerRef = useRef(null)
   const markdownInputRef = useRef(null)
-  const autoScrollTimerRef = useRef(null)
 
   useEffect(() => {
     try {
@@ -131,101 +128,6 @@ function App() {
     return undefined
   }, [isEditing])
 
-  useEffect(() => {
-    if (autoScrollTimerRef.current) {
-      window.clearInterval(autoScrollTimerRef.current)
-      autoScrollTimerRef.current = null
-    }
-
-    if (isEditing || !isAutoScrolling) return undefined
-
-    let stallCount = 0
-    let bootRetries = 0
-    let movedOnce = false
-    let bottomReachCount = 0
-    const startTimer = () => {
-      if (autoScrollTimerRef.current) {
-        window.clearInterval(autoScrollTimerRef.current)
-        autoScrollTimerRef.current = null
-      }
-      autoScrollTimerRef.current = window.setInterval(() => {
-        const node = containerRef.current
-        if (!node) return
-
-        const maxScrollTop = node.scrollHeight - node.clientHeight
-        if (maxScrollTop <= 0) {
-          bootRetries += 1
-          if (bootRetries > 25) {
-            setIsAutoScrolling(false)
-            setSaveStatus('当前内容不足以滚动')
-          }
-          return
-        }
-
-        const prevTop = node.scrollTop
-        const nextTop = Math.min(maxScrollTop, prevTop + scrollSpeed)
-        node.scrollTop = nextTop
-        if (node.scrollTop === prevTop && nextTop > prevTop) {
-          node.scrollTo(0, nextTop)
-        }
-
-        if (node.scrollTop > prevTop) movedOnce = true
-
-        if (node.scrollTop === prevTop) {
-          stallCount += 1
-          if (stallCount > 35 && !movedOnce) {
-            node.scrollTo(0, nextTop + 1)
-            if (node.scrollTop === prevTop) {
-              setIsAutoScrolling(false)
-              setSaveStatus('自动滚动在当前设备受限，请手动滑动')
-            }
-          }
-        } else {
-          stallCount = 0
-        }
-
-        if (node.scrollTop >= maxScrollTop - 1) {
-          bottomReachCount += 1
-          // Avoid iOS jitter causing immediate false "reached bottom".
-          if (bottomReachCount > 8) {
-            setIsAutoScrolling(false)
-          }
-        } else {
-          bottomReachCount = 0
-        }
-      }, 16)
-    }
-
-    // iOS 上布局值在进入提词瞬间可能尚未稳定，延迟一帧再启动更可靠。
-    const bootTimer = window.setTimeout(() => {
-      startTimer()
-    }, 80)
-
-    return () => {
-      window.clearTimeout(bootTimer)
-      if (autoScrollTimerRef.current) {
-        window.clearInterval(autoScrollTimerRef.current)
-        autoScrollTimerRef.current = null
-      }
-    }
-  }, [isAutoScrolling, isEditing, scrollSpeed])
-
-  const handleToggleAutoScroll = () => {
-    if (isAutoScrolling) {
-      setIsAutoScrolling(false)
-      return
-    }
-
-    const node = containerRef.current
-    if (node) {
-      const maxTop = node.scrollHeight - node.clientHeight
-      if (maxTop > 0 && node.scrollTop >= maxTop - 2) {
-        node.scrollTo(0, 0)
-      }
-    }
-    setIsAutoScrolling(true)
-  }
-
   const handleStart = () => {
     if (!text.trim()) {
       alert('请先输入或粘贴一些文字')
@@ -238,7 +140,6 @@ function App() {
   const handleExit = () => {
     setIsEditing(true)
     setIsRotated(false)
-    setIsAutoScrolling(false)
   }
 
   const handleClearDraft = () => {
@@ -452,32 +353,11 @@ function App() {
                     <FlipHorizontal size={24} />
                   </button>
 
-                  <button
-                    type="button"
-                  onClick={handleToggleAutoScroll}
-                    className={`state-button ${isAutoScrolling ? 'active-purple' : ''}`}
-                    title="自动滚动开关"
-                  >
-                    {isAutoScrolling ? <Pause size={24} /> : <Play size={24} />}
-                  </button>
-
                   <button type="button" onClick={handleExit} className="exit-button" title="退出提词">
                     <X size={24} />
                   </button>
                 </div>
               </div>
-            </div>
-
-            <div className={`scroll-speed-panel ${showControls ? 'controls-visible' : 'controls-hidden'}`}>
-              <span>速度 {scrollSpeed.toFixed(1)}</span>
-              <input
-                type="range"
-                min="0.5"
-                max="6"
-                step="0.1"
-                value={scrollSpeed}
-                onChange={(e) => setScrollSpeed(Number(e.target.value))}
-              />
             </div>
 
             <div
