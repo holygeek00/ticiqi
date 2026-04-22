@@ -1,35 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
 import { Edit2, FlipHorizontal, Play, Smartphone, X, ZoomIn, ZoomOut } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import './App.css'
 
 const DRAFT_KEY = 'teleprompter_draft_v1'
-const HISTORY_KEY = 'teleprompter_recent_40_v1'
-const MAX_HISTORY = 40
-const TEMPLATE_TEXT = `【开场】
-大家好，今天给大家分享一个重点内容。
+const CARD_LIMIT = 50
+const MD_FORMAT_GUIDE = `# 卡片标题1
+这里是第一段提词内容。
+可以多行。
 
-【第一部分：背景】
-先说结论：这一点非常关键，建议先记下来。
+---
 
-【第二部分：核心要点】
-第一，要明确目标。
-第二，要拆分步骤。
-第三，要持续复盘优化。
+# 卡片标题2
+这里是第二段提词内容。
 
-【第三部分：行动建议】
-今天就先完成第一步，别追求一步到位。
+---
 
-【结尾】
-如果这段内容对你有帮助，记得收藏，方便后续复盘。`
+没有标题也可以，系统会用首行自动生成标题。`
 
-const getHistoryFromStorage = () => {
-  try {
-    const raw = localStorage.getItem(HISTORY_KEY)
-    const parsed = raw ? JSON.parse(raw) : []
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
+const MARKDOWN_COMPONENTS = {
+  h1: ({ ...props }) => <h4 {...props} />,
+  h2: ({ ...props }) => <h4 {...props} />,
+  h3: ({ ...props }) => <h4 {...props} />,
 }
 
 const getDraftTitle = (content) => {
@@ -39,6 +32,31 @@ const getDraftTitle = (content) => {
     .find(Boolean)
   if (!firstLine) return '未命名草稿'
   return firstLine.slice(0, 24)
+}
+
+const parseMarkdownToCards = (rawMarkdown) => {
+  const normalized = rawMarkdown.replace(/\r\n/g, '\n').trim()
+  if (!normalized) return []
+
+  return normalized
+    .split(/\n-{3,}\n/g)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((block, index) => {
+      const lines = block.split('\n')
+      const firstLine = lines[0]?.trim() ?? ''
+      const hasMarkdownTitle = firstLine.startsWith('# ')
+      const title = hasMarkdownTitle ? firstLine.slice(2).trim() || `卡片${index + 1}` : getDraftTitle(block)
+      const content = hasMarkdownTitle ? lines.slice(1).join('\n').trim() : block
+      return {
+        id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`,
+        title,
+        content: content || block,
+        createdAt: Date.now(),
+      }
+    })
+    .filter((card) => card.content.trim())
+    .slice(0, CARD_LIMIT)
 }
 
 function App() {
@@ -55,7 +73,8 @@ function App() {
   const [showControls, setShowControls] = useState(true)
   const [isRotated, setIsRotated] = useState(false)
   const [saveStatus, setSaveStatus] = useState('')
-  const [recentDrafts, setRecentDrafts] = useState(() => getHistoryFromStorage())
+  const [importedCards, setImportedCards] = useState([])
+  const [activeCardId, setActiveCardId] = useState('')
   const containerRef = useRef(null)
   const markdownInputRef = useRef(null)
 
@@ -71,14 +90,6 @@ function App() {
       setSaveStatus('保存失败：浏览器存储不可用')
     }
   }, [text])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(recentDrafts))
-    } catch {
-      // Ignore storage errors to avoid blocking editing.
-    }
-  }, [recentDrafts])
 
   useEffect(() => {
     let timeout
@@ -121,7 +132,6 @@ function App() {
       alert('请先输入或粘贴一些文字')
       return
     }
-    saveCurrentToRecent(text)
     setIsEditing(false)
     setShowControls(true)
   }
@@ -141,41 +151,6 @@ function App() {
     }
   }
 
-  function saveCurrentToRecent(content) {
-    const normalized = content.trim()
-    if (!normalized) return
-
-    const item = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      title: getDraftTitle(normalized),
-      content: normalized,
-      updatedAt: Date.now(),
-    }
-
-    setRecentDrafts((prev) => {
-      const deduped = prev.filter((d) => d.content !== normalized)
-      return [item, ...deduped].slice(0, MAX_HISTORY)
-    })
-  }
-
-  const handleImportTemplate = () => {
-    setText(TEMPLATE_TEXT)
-    setSaveStatus('模板已导入')
-  }
-
-  const handleLoadRecent = (content) => {
-    setText(content)
-    setSaveStatus('已载入历史草稿')
-  }
-
-  const handleDeleteRecent = (id) => {
-    setRecentDrafts((prev) => prev.filter((d) => d.id !== id))
-  }
-
-  const handleClearRecent = () => {
-    setRecentDrafts([])
-  }
-
   const handlePickMarkdown = () => {
     markdownInputRef.current?.click()
   }
@@ -191,15 +166,28 @@ function App() {
     }
 
     try {
-      const content = await file.text()
-      setText(content)
-      saveCurrentToRecent(content)
-      setSaveStatus(`已导入：${file.name}`)
+      const markdownText = await file.text()
+      const cards = parseMarkdownToCards(markdownText)
+      if (cards.length === 0) {
+        setSaveStatus('导入失败：内容为空或格式无效')
+        event.target.value = ''
+        return
+      }
+      setImportedCards(cards)
+      setActiveCardId(cards[0].id)
+      setText(cards[0].content)
+      setSaveStatus(`导入成功：${cards.length} 张卡片`)
     } catch {
       setSaveStatus('导入失败，请重试')
     } finally {
       event.target.value = ''
     }
+  }
+
+  const handleLoadCard = (card) => {
+    setActiveCardId(card.id)
+    setText(card.content)
+    setSaveStatus(`已载入卡片：${card.title}`)
   }
 
   return (
@@ -219,13 +207,7 @@ function App() {
                 onChange={handleImportMarkdown}
               />
               <button type="button" className="ghost-button" onClick={handlePickMarkdown}>
-                导入MD
-              </button>
-              <button type="button" className="ghost-button" onClick={handleImportTemplate}>
-                导入模板
-              </button>
-              <button type="button" className="ghost-button" onClick={() => saveCurrentToRecent(text)}>
-                保存到最近
+                导入 MD
               </button>
               <button type="button" className="ghost-button" onClick={handleClearDraft}>
                 清空草稿
@@ -244,27 +226,36 @@ function App() {
             />
           </div>
           {saveStatus && <p className="save-status">{saveStatus}</p>}
-
-          <div className="recent-header">
-            <span>最近草稿（最多 40 条）</span>
-            <button type="button" className="mini-danger" onClick={handleClearRecent}>
-              清空记录
-            </button>
+          <div className="md-guide">
+            <strong className="md-guide-title">MD 格式说明（--- 分隔卡片）</strong>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+              {MD_FORMAT_GUIDE}
+            </ReactMarkdown>
           </div>
-          <div className="recent-list">
-            {recentDrafts.length === 0 ? (
-              <p className="recent-empty">暂无历史记录</p>
+
+          <div className="card-header">
+            <strong>导入卡片</strong>
+            <span>{importedCards.length} / {CARD_LIMIT}</span>
+          </div>
+          <div className="card-list">
+            {importedCards.length === 0 ? (
+              <p className="card-empty">还没有导入卡片，点击“导入 MD”开始。</p>
             ) : (
-              recentDrafts.map((draft) => (
-                <div key={draft.id} className="recent-item">
-                  <button type="button" className="recent-load" onClick={() => handleLoadRecent(draft.content)}>
-                    <strong>{draft.title}</strong>
-                    <span>{new Date(draft.updatedAt).toLocaleString()}</span>
-                  </button>
-                  <button type="button" className="mini-danger" onClick={() => handleDeleteRecent(draft.id)}>
-                    删除
-                  </button>
-                </div>
+              importedCards.map((card) => (
+                <button
+                  key={card.id}
+                  type="button"
+                  className={`card-item ${activeCardId === card.id ? 'card-item-active' : ''}`}
+                  onClick={() => handleLoadCard(card)}
+                >
+                  <strong className="card-title">{card.title}</strong>
+                  <span>{new Date(card.createdAt).toLocaleString()}</span>
+                  <div className="card-markdown">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+                      {card.content}
+                    </ReactMarkdown>
+                  </div>
+                </button>
               ))
             )}
           </div>
