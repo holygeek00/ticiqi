@@ -312,11 +312,23 @@
   right: 0;
   padding-block: 1rem;
   display: flex;
-  justify-content: space-between;
   align-items: center;
   background: linear-gradient(to bottom, rgb(0 0 0 / 90%), rgb(0 0 0 / 45%), transparent);
   transition: opacity 0.5s;
   z-index: 50;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.controls-inner {
+  width: 100%;
+  min-width: max-content;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
 }
 
 .controls-visible {

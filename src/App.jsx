@@ -339,57 +339,59 @@ function App() {
               className={`controls-bar ${showControls ? 'controls-visible' : 'controls-hidden'}`}
               style={{ paddingInline: isRotated ? '3rem' : '1rem' }}
             >
-              <div className="pill-group">
-                <button
-                  type="button"
-                  onClick={() => setFontSize((f) => Math.max(20, f - 4))}
-                  className="icon-button"
-                  title="缩小字体"
-                >
-                  <ZoomOut size={24} />
-                </button>
-                <span className="font-size-readout">{fontSize}</span>
-                <button
-                  type="button"
-                  onClick={() => setFontSize((f) => Math.min(250, f + 4))}
-                  className="icon-button"
-                  title="放大字体"
-                >
-                  <ZoomIn size={24} />
-                </button>
-              </div>
+              <div className="controls-inner">
+                <div className="pill-group">
+                  <button
+                    type="button"
+                    onClick={() => setFontSize((f) => Math.max(20, f - 4))}
+                    className="icon-button"
+                    title="缩小字体"
+                  >
+                    <ZoomOut size={24} />
+                  </button>
+                  <span className="font-size-readout">{fontSize}</span>
+                  <button
+                    type="button"
+                    onClick={() => setFontSize((f) => Math.min(250, f + 4))}
+                    className="icon-button"
+                    title="放大字体"
+                  >
+                    <ZoomIn size={24} />
+                  </button>
+                </div>
 
-              <div className="actions-group">
-                <button
-                  type="button"
-                  onClick={() => setIsRotated(!isRotated)}
-                  className={`state-button ${isRotated ? 'active-green' : ''}`}
-                  title="强制横屏/竖屏"
-                >
-                  <Smartphone size={24} className={isRotated ? '' : 'rotated-90'} />
-                </button>
+                <div className="actions-group">
+                  <button
+                    type="button"
+                    onClick={() => setIsRotated(!isRotated)}
+                    className={`state-button ${isRotated ? 'active-green' : ''}`}
+                    title="强制横屏/竖屏"
+                  >
+                    <Smartphone size={24} className={isRotated ? '' : 'rotated-90'} />
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setIsMirrored(!isMirrored)}
-                  className={`state-button ${isMirrored ? 'active-blue' : ''}`}
-                  title="镜像反转"
-                >
-                  <FlipHorizontal size={24} />
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsMirrored(!isMirrored)}
+                    className={`state-button ${isMirrored ? 'active-blue' : ''}`}
+                    title="镜像反转"
+                  >
+                    <FlipHorizontal size={24} />
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setIsAutoScrolling((v) => !v)}
-                  className={`state-button ${isAutoScrolling ? 'active-purple' : ''}`}
-                  title="自动滚动开关"
-                >
-                  {isAutoScrolling ? <Pause size={24} /> : <Play size={24} />}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsAutoScrolling((v) => !v)}
+                    className={`state-button ${isAutoScrolling ? 'active-purple' : ''}`}
+                    title="自动滚动开关"
+                  >
+                    {isAutoScrolling ? <Pause size={24} /> : <Play size={24} />}
+                  </button>
 
-                <button type="button" onClick={handleExit} className="exit-button" title="退出提词">
-                  <X size={24} />
-                </button>
+                  <button type="button" onClick={handleExit} className="exit-button" title="退出提词">
+                    <X size={24} />
+                  </button>
+                </div>
               </div>
             </div>
 
