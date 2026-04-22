@@ -139,29 +139,61 @@ function App() {
 
     if (isEditing || !isAutoScrolling) return undefined
 
-    const el = containerRef.current
-    if (!el) return undefined
+    let stallCount = 0
+    let bootRetries = 0
+    const startTimer = () => {
+      if (autoScrollTimerRef.current) {
+        window.clearInterval(autoScrollTimerRef.current)
+        autoScrollTimerRef.current = null
+      }
+      autoScrollTimerRef.current = window.setInterval(() => {
+        const node = containerRef.current
+        if (!node) return
 
-    const maxTop = el.scrollHeight - el.clientHeight
-    if (maxTop <= 0) {
-      setIsAutoScrolling(false)
-      setSaveStatus('当前内容不足以滚动')
-      return undefined
+        const maxScrollTop = node.scrollHeight - node.clientHeight
+        if (maxScrollTop <= 0) {
+          bootRetries += 1
+          if (bootRetries > 25) {
+            setIsAutoScrolling(false)
+            setSaveStatus('当前内容不足以滚动')
+          }
+          return
+        }
+
+        const prevTop = node.scrollTop
+        const nextTop = Math.min(maxScrollTop, prevTop + scrollSpeed)
+        node.scrollTop = nextTop
+        if (node.scrollTop === prevTop && nextTop > prevTop) {
+          node.scrollTo(0, nextTop)
+        }
+
+        if (node.scrollTop >= maxScrollTop - 1) {
+          setIsAutoScrolling(false)
+          return
+        }
+
+        if (node.scrollTop === prevTop) {
+          stallCount += 1
+          if (stallCount > 20) {
+            node.scrollTo(0, nextTop + 1)
+            if (node.scrollTop === prevTop) {
+              setIsAutoScrolling(false)
+              setSaveStatus('自动滚动在当前设备受限，请手动滑动')
+            }
+          }
+        } else {
+          stallCount = 0
+        }
+      }, 16)
     }
 
-    autoScrollTimerRef.current = window.setInterval(() => {
-      const node = containerRef.current
-      if (!node) return
-
-      const maxScrollTop = node.scrollHeight - node.clientHeight
-      if (node.scrollTop >= maxScrollTop - 1) {
-        setIsAutoScrolling(false)
-        return
-      }
-      node.scrollBy({ top: scrollSpeed, behavior: 'auto' })
-    }, 16)
+    // iOS 上布局值在进入提词瞬间可能尚未稳定，延迟一帧再启动更可靠。
+    const bootTimer = window.setTimeout(() => {
+      startTimer()
+    }, 80)
 
     return () => {
+      window.clearTimeout(bootTimer)
       if (autoScrollTimerRef.current) {
         window.clearInterval(autoScrollTimerRef.current)
         autoScrollTimerRef.current = null
