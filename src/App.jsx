@@ -260,6 +260,11 @@ function App() {
                 <strong>导入卡片</strong>
                 <span>{importedCards.length} / {CARD_LIMIT}</span>
               </div>
+              <div className="card-page-actions">
+                <button type="button" className="ghost-button" onClick={() => setEditorTab('editor')}>
+                  返回编辑页
+                </button>
+              </div>
               <div className="card-list card-page-list">
                 {importedCards.length === 0 ? (
                   <p className="card-empty">还没有导入卡片，点击“导入 MD”开始。</p>

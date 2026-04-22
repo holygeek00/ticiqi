@@ -193,6 +193,11 @@
   align-content: start;
 }
 
+.card-page-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .card-empty {
   margin: 0.5rem;
   color: #9ca3af;
