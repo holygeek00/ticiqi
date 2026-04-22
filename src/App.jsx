@@ -3,6 +3,43 @@ import { Edit2, FlipHorizontal, Play, Smartphone, X, ZoomIn, ZoomOut } from 'luc
 import './App.css'
 
 const DRAFT_KEY = 'teleprompter_draft_v1'
+const HISTORY_KEY = 'teleprompter_recent_40_v1'
+const MAX_HISTORY = 40
+const TEMPLATE_TEXT = `【开场】
+大家好，今天给大家分享一个重点内容。
+
+【第一部分：背景】
+先说结论：这一点非常关键，建议先记下来。
+
+【第二部分：核心要点】
+第一，要明确目标。
+第二，要拆分步骤。
+第三，要持续复盘优化。
+
+【第三部分：行动建议】
+今天就先完成第一步，别追求一步到位。
+
+【结尾】
+如果这段内容对你有帮助，记得收藏，方便后续复盘。`
+
+const getHistoryFromStorage = () => {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+const getDraftTitle = (content) => {
+  const firstLine = content
+    .split('\n')
+    .map((line) => line.trim())
+    .find(Boolean)
+  if (!firstLine) return '未命名草稿'
+  return firstLine.slice(0, 24)
+}
 
 function App() {
   const [text, setText] = useState(() => {
@@ -18,7 +55,9 @@ function App() {
   const [showControls, setShowControls] = useState(true)
   const [isRotated, setIsRotated] = useState(false)
   const [saveStatus, setSaveStatus] = useState('')
+  const [recentDrafts, setRecentDrafts] = useState(() => getHistoryFromStorage())
   const containerRef = useRef(null)
+  const markdownInputRef = useRef(null)
 
   useEffect(() => {
     try {
@@ -32,6 +71,14 @@ function App() {
       setSaveStatus('保存失败：浏览器存储不可用')
     }
   }, [text])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(recentDrafts))
+    } catch {
+      // Ignore storage errors to avoid blocking editing.
+    }
+  }, [recentDrafts])
 
   useEffect(() => {
     let timeout
@@ -74,6 +121,7 @@ function App() {
       alert('请先输入或粘贴一些文字')
       return
     }
+    saveCurrentToRecent(text)
     setIsEditing(false)
     setShowControls(true)
   }
@@ -93,6 +141,67 @@ function App() {
     }
   }
 
+  function saveCurrentToRecent(content) {
+    const normalized = content.trim()
+    if (!normalized) return
+
+    const item = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title: getDraftTitle(normalized),
+      content: normalized,
+      updatedAt: Date.now(),
+    }
+
+    setRecentDrafts((prev) => {
+      const deduped = prev.filter((d) => d.content !== normalized)
+      return [item, ...deduped].slice(0, MAX_HISTORY)
+    })
+  }
+
+  const handleImportTemplate = () => {
+    setText(TEMPLATE_TEXT)
+    setSaveStatus('模板已导入')
+  }
+
+  const handleLoadRecent = (content) => {
+    setText(content)
+    setSaveStatus('已载入历史草稿')
+  }
+
+  const handleDeleteRecent = (id) => {
+    setRecentDrafts((prev) => prev.filter((d) => d.id !== id))
+  }
+
+  const handleClearRecent = () => {
+    setRecentDrafts([])
+  }
+
+  const handlePickMarkdown = () => {
+    markdownInputRef.current?.click()
+  }
+
+  const handleImportMarkdown = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!file.name.toLowerCase().endsWith('.md')) {
+      setSaveStatus('请选择 .md 文件')
+      event.target.value = ''
+      return
+    }
+
+    try {
+      const content = await file.text()
+      setText(content)
+      saveCurrentToRecent(content)
+      setSaveStatus(`已导入：${file.name}`)
+    } catch {
+      setSaveStatus('导入失败，请重试')
+    } finally {
+      event.target.value = ''
+    }
+  }
+
   return (
     <div className="app">
       {isEditing ? (
@@ -101,9 +210,27 @@ function App() {
             <h1 className="editor-title">
               <Edit2 size={24} /> 提词器文本编辑
             </h1>
-            <button type="button" className="ghost-button" onClick={handleClearDraft}>
-              清空草稿
-            </button>
+            <div className="header-actions">
+              <input
+                ref={markdownInputRef}
+                type="file"
+                accept=".md,text/markdown"
+                className="hidden-file-input"
+                onChange={handleImportMarkdown}
+              />
+              <button type="button" className="ghost-button" onClick={handlePickMarkdown}>
+                导入MD
+              </button>
+              <button type="button" className="ghost-button" onClick={handleImportTemplate}>
+                导入模板
+              </button>
+              <button type="button" className="ghost-button" onClick={() => saveCurrentToRecent(text)}>
+                保存到最近
+              </button>
+              <button type="button" className="ghost-button" onClick={handleClearDraft}>
+                清空草稿
+              </button>
+            </div>
           </div>
 
           <div className="editor-body">
@@ -117,6 +244,30 @@ function App() {
             />
           </div>
           {saveStatus && <p className="save-status">{saveStatus}</p>}
+
+          <div className="recent-header">
+            <span>最近草稿（最多 40 条）</span>
+            <button type="button" className="mini-danger" onClick={handleClearRecent}>
+              清空记录
+            </button>
+          </div>
+          <div className="recent-list">
+            {recentDrafts.length === 0 ? (
+              <p className="recent-empty">暂无历史记录</p>
+            ) : (
+              recentDrafts.map((draft) => (
+                <div key={draft.id} className="recent-item">
+                  <button type="button" className="recent-load" onClick={() => handleLoadRecent(draft.content)}>
+                    <strong>{draft.title}</strong>
+                    <span>{new Date(draft.updatedAt).toLocaleString()}</span>
+                  </button>
+                  <button type="button" className="mini-danger" onClick={() => handleDeleteRecent(draft.id)}>
+                    删除
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
 
           <button onClick={handleStart} className="start-button">
             <Play size={24} fill="currentColor" /> 开始提词

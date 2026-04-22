@@ -13,6 +13,7 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  overflow: hidden;
 }
 
 .editor-header {
@@ -32,6 +33,18 @@
 
 .editor-body {
   flex: 1;
+  min-height: 32vh;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.hidden-file-input {
+  display: none;
 }
 
 .ghost-button {
@@ -92,6 +105,79 @@
   margin: 0;
   font-size: 0.9rem;
   color: #9ca3af;
+}
+
+.recent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: #cbd5e1;
+  font-size: 0.95rem;
+}
+
+.recent-list {
+  border: 1px solid #374151;
+  border-radius: 0.85rem;
+  padding: 0.5rem;
+  max-height: 22vh;
+  overflow-y: auto;
+  background: rgb(17 24 39 / 50%);
+}
+
+.recent-empty {
+  margin: 0.5rem;
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+.recent-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem;
+}
+
+.recent-load {
+  flex: 1;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #e5e7eb;
+  border-radius: 0.65rem;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.recent-load:hover {
+  background: #1f2937;
+}
+
+.recent-load strong {
+  font-size: 0.95rem;
+}
+
+.recent-load span {
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+
+.mini-danger {
+  border: 1px solid #7f1d1d;
+  background: #1f1114;
+  color: #fca5a5;
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.65rem;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.mini-danger:hover {
+  background: #3f1218;
 }
 
 .teleprompter-shell {
