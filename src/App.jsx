@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Edit2, FlipHorizontal, Play, Smartphone, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { Edit2, FlipHorizontal, Pause, Play, Smartphone, X, ZoomIn, ZoomOut } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import './App.css'
@@ -72,6 +72,8 @@ function App() {
   const [isMirrored, setIsMirrored] = useState(false)
   const [showControls, setShowControls] = useState(true)
   const [isRotated, setIsRotated] = useState(false)
+  const [isAutoScrolling, setIsAutoScrolling] = useState(false)
+  const [scrollSpeed, setScrollSpeed] = useState(1.5)
   const [saveStatus, setSaveStatus] = useState('')
   const [importedCards, setImportedCards] = useState([])
   const [activeCardId, setActiveCardId] = useState('')
@@ -128,6 +130,29 @@ function App() {
     return undefined
   }, [isEditing])
 
+  useEffect(() => {
+    if (isEditing || !isAutoScrolling) return undefined
+
+    let rafId = 0
+    const step = () => {
+      const el = containerRef.current
+      if (el) {
+        const maxTop = el.scrollHeight - el.clientHeight
+        if (el.scrollTop < maxTop) {
+          el.scrollTop += scrollSpeed
+          rafId = window.requestAnimationFrame(step)
+        } else {
+          setIsAutoScrolling(false)
+        }
+      } else {
+        rafId = window.requestAnimationFrame(step)
+      }
+    }
+
+    rafId = window.requestAnimationFrame(step)
+    return () => window.cancelAnimationFrame(rafId)
+  }, [isAutoScrolling, isEditing, scrollSpeed])
+
   const handleStart = () => {
     if (!text.trim()) {
       alert('请先输入或粘贴一些文字')
@@ -140,6 +165,7 @@ function App() {
   const handleExit = () => {
     setIsEditing(true)
     setIsRotated(false)
+    setIsAutoScrolling(false)
   }
 
   const handleClearDraft = () => {
@@ -352,10 +378,31 @@ function App() {
                   <FlipHorizontal size={24} />
                 </button>
 
+                <button
+                  type="button"
+                  onClick={() => setIsAutoScrolling((v) => !v)}
+                  className={`state-button ${isAutoScrolling ? 'active-purple' : ''}`}
+                  title="自动滚动开关"
+                >
+                  {isAutoScrolling ? <Pause size={24} /> : <Play size={24} />}
+                </button>
+
                 <button type="button" onClick={handleExit} className="exit-button" title="退出提词">
                   <X size={24} />
                 </button>
               </div>
+            </div>
+
+            <div className={`scroll-speed-panel ${showControls ? 'controls-visible' : 'controls-hidden'}`}>
+              <span>速度 {scrollSpeed.toFixed(1)}</span>
+              <input
+                type="range"
+                min="0.5"
+                max="6"
+                step="0.1"
+                value={scrollSpeed}
+                onChange={(e) => setScrollSpeed(Number(e.target.value))}
+              />
             </div>
 
             <div
