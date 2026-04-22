@@ -160,8 +160,18 @@ function App() {
     const file = event.target.files?.[0]
     if (!file) return
 
-    if (!file.name.toLowerCase().endsWith('.md')) {
-      setSaveStatus('请选择 .md 文件')
+    const fileName = file.name.toLowerCase()
+    const fileType = (file.type || '').toLowerCase()
+    const isSupported =
+      fileName.endsWith('.md') ||
+      fileName.endsWith('.markdown') ||
+      fileName.endsWith('.txt') ||
+      fileType.includes('markdown') ||
+      fileType === 'text/plain' ||
+      fileType === ''
+
+    if (!isSupported) {
+      setSaveStatus('请选择 md/markdown/txt 文本文件')
       event.target.value = ''
       return
     }
@@ -205,7 +215,7 @@ function App() {
               <input
                 ref={markdownInputRef}
                 type="file"
-                accept=".md,text/markdown"
+                accept=".md,.markdown,.txt,text/plain,text/markdown,*/*"
                 className="hidden-file-input"
                 onChange={handleImportMarkdown}
               />
