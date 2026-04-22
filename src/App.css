@@ -43,6 +43,27 @@
   flex-wrap: wrap;
 }
 
+.editor-tabs {
+  display: inline-flex;
+  gap: 0.5rem;
+}
+
+.tab-button {
+  border: 1px solid #334155;
+  background: #0f172a;
+  color: #cbd5e1;
+  border-radius: 999px;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.tab-button-active {
+  border-color: #3b82f6;
+  background: rgb(30 64 175 / 25%);
+  color: #dbeafe;
+}
+
 .hidden-file-input {
   display: none;
 }
@@ -163,6 +184,13 @@
   display: grid;
   gap: 0.55rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.card-page-list {
+  flex: 1;
+  max-height: none;
+  min-height: 0;
+  align-content: start;
 }
 
 .card-empty {

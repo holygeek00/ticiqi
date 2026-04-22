@@ -75,6 +75,7 @@ function App() {
   const [saveStatus, setSaveStatus] = useState('')
   const [importedCards, setImportedCards] = useState([])
   const [activeCardId, setActiveCardId] = useState('')
+  const [editorTab, setEditorTab] = useState('editor')
   const containerRef = useRef(null)
   const markdownInputRef = useRef(null)
 
@@ -176,6 +177,7 @@ function App() {
       setImportedCards(cards)
       setActiveCardId(cards[0].id)
       setText(cards[0].content)
+      setEditorTab('cards')
       setSaveStatus(`导入成功：${cards.length} 张卡片`)
     } catch {
       setSaveStatus('导入失败，请重试')
@@ -187,6 +189,7 @@ function App() {
   const handleLoadCard = (card) => {
     setActiveCardId(card.id)
     setText(card.content)
+    setEditorTab('editor')
     setSaveStatus(`已载入卡片：${card.title}`)
   }
 
@@ -214,51 +217,73 @@ function App() {
               </button>
             </div>
           </div>
-
-          <div className="editor-body">
-            <textarea
-              className="editor-textarea"
-              placeholder={
-                '请在此粘贴或输入您的提词文本...\n\n进入提词模式后，可通过右上角按钮强制横屏显示，横屏时文字会自动铺满屏幕。'
-              }
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-            />
-          </div>
-          {saveStatus && <p className="save-status">{saveStatus}</p>}
-          <div className="md-guide">
-            <strong className="md-guide-title">MD 格式说明（--- 分隔卡片）</strong>
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
-              {MD_FORMAT_GUIDE}
-            </ReactMarkdown>
+          <div className="editor-tabs">
+            <button
+              type="button"
+              className={`tab-button ${editorTab === 'editor' ? 'tab-button-active' : ''}`}
+              onClick={() => setEditorTab('editor')}
+            >
+              编辑页
+            </button>
+            <button
+              type="button"
+              className={`tab-button ${editorTab === 'cards' ? 'tab-button-active' : ''}`}
+              onClick={() => setEditorTab('cards')}
+            >
+              导入卡片页
+            </button>
           </div>
 
-          <div className="card-header">
-            <strong>导入卡片</strong>
-            <span>{importedCards.length} / {CARD_LIMIT}</span>
-          </div>
-          <div className="card-list">
-            {importedCards.length === 0 ? (
-              <p className="card-empty">还没有导入卡片，点击“导入 MD”开始。</p>
-            ) : (
-              importedCards.map((card) => (
-                <button
-                  key={card.id}
-                  type="button"
-                  className={`card-item ${activeCardId === card.id ? 'card-item-active' : ''}`}
-                  onClick={() => handleLoadCard(card)}
-                >
-                  <strong className="card-title">{card.title}</strong>
-                  <span>{new Date(card.createdAt).toLocaleString()}</span>
-                  <div className="card-markdown">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
-                      {card.content}
-                    </ReactMarkdown>
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
+          {editorTab === 'editor' ? (
+            <>
+              <div className="editor-body">
+                <textarea
+                  className="editor-textarea"
+                  placeholder={
+                    '请在此粘贴或输入您的提词文本...\n\n进入提词模式后，可通过右上角按钮强制横屏显示，横屏时文字会自动铺满屏幕。'
+                  }
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                />
+              </div>
+              {saveStatus && <p className="save-status">{saveStatus}</p>}
+              <div className="md-guide">
+                <strong className="md-guide-title">MD 格式说明（--- 分隔卡片）</strong>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+                  {MD_FORMAT_GUIDE}
+                </ReactMarkdown>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="card-header">
+                <strong>导入卡片</strong>
+                <span>{importedCards.length} / {CARD_LIMIT}</span>
+              </div>
+              <div className="card-list card-page-list">
+                {importedCards.length === 0 ? (
+                  <p className="card-empty">还没有导入卡片，点击“导入 MD”开始。</p>
+                ) : (
+                  importedCards.map((card) => (
+                    <button
+                      key={card.id}
+                      type="button"
+                      className={`card-item ${activeCardId === card.id ? 'card-item-active' : ''}`}
+                      onClick={() => handleLoadCard(card)}
+                    >
+                      <strong className="card-title">{card.title}</strong>
+                      <span>{new Date(card.createdAt).toLocaleString()}</span>
+                      <div className="card-markdown">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+                          {card.content}
+                        </ReactMarkdown>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          )}
 
           <button onClick={handleStart} className="start-button">
             <Play size={24} fill="currentColor" /> 开始提词
