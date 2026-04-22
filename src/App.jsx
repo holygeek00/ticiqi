@@ -89,12 +89,7 @@ function App() {
       ) : (
         <div className="teleprompter-shell">
           <div
-            className="teleprompter-stage"
-            style={{
-              width: isRotated ? '100vh' : '100vw',
-              height: isRotated ? '100vw' : '100vh',
-              transform: isRotated ? 'rotate(90deg)' : 'none',
-            }}
+            className={`teleprompter-stage ${isRotated ? 'force-landscape' : ''}`}
           >
             <div
               className={`controls-bar ${showControls ? 'controls-visible' : 'controls-hidden'}`}
@@ -148,7 +143,7 @@ function App() {
             <div
               ref={containerRef}
               className="teleprompter-scroll"
-              style={{ paddingTop: '30vh', paddingBottom: '50vh' }}
+              style={{ paddingTop: isRotated ? '20vw' : '30vh', paddingBottom: isRotated ? '36vw' : '50vh' }}
             >
               <div
                 className="teleprompter-text"

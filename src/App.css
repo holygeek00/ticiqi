@@ -82,12 +82,25 @@
 }
 
 .teleprompter-stage {
+  width: 100vw;
+  height: 100dvh;
   position: relative;
   background: #000;
   display: flex;
   flex-direction: column;
   transition: transform 0.3s ease-in-out;
   transform-origin: center;
+  overflow: hidden;
+}
+
+.force-landscape {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: 100dvh;
+  height: 100vw;
+  transform: rotate(90deg);
+  transform-origin: top left;
 }
 
 .controls-bar {
