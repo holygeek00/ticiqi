@@ -2,14 +2,36 @@ import { useEffect, useRef, useState } from 'react'
 import { Edit2, FlipHorizontal, Play, Smartphone, X, ZoomIn, ZoomOut } from 'lucide-react'
 import './App.css'
 
+const DRAFT_KEY = 'teleprompter_draft_v1'
+
 function App() {
-  const [text, setText] = useState('')
+  const [text, setText] = useState(() => {
+    try {
+      return localStorage.getItem(DRAFT_KEY) ?? ''
+    } catch {
+      return ''
+    }
+  })
   const [isEditing, setIsEditing] = useState(true)
   const [fontSize, setFontSize] = useState(72)
   const [isMirrored, setIsMirrored] = useState(false)
   const [showControls, setShowControls] = useState(true)
   const [isRotated, setIsRotated] = useState(false)
+  const [saveStatus, setSaveStatus] = useState('')
   const containerRef = useRef(null)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRAFT_KEY, text)
+      if (text.trim()) {
+        setSaveStatus('草稿已自动保存')
+      } else {
+        setSaveStatus('')
+      }
+    } catch {
+      setSaveStatus('保存失败：浏览器存储不可用')
+    }
+  }, [text])
 
   useEffect(() => {
     let timeout
@@ -61,6 +83,16 @@ function App() {
     setIsRotated(false)
   }
 
+  const handleClearDraft = () => {
+    setText('')
+    try {
+      localStorage.removeItem(DRAFT_KEY)
+      setSaveStatus('草稿已清空')
+    } catch {
+      setSaveStatus('清空失败：浏览器存储不可用')
+    }
+  }
+
   return (
     <div className="app">
       {isEditing ? (
@@ -69,6 +101,9 @@ function App() {
             <h1 className="editor-title">
               <Edit2 size={24} /> 提词器文本编辑
             </h1>
+            <button type="button" className="ghost-button" onClick={handleClearDraft}>
+              清空草稿
+            </button>
           </div>
 
           <div className="editor-body">
@@ -81,6 +116,7 @@ function App() {
               onChange={(e) => setText(e.target.value)}
             />
           </div>
+          {saveStatus && <p className="save-status">{saveStatus}</p>}
 
           <button onClick={handleStart} className="start-button">
             <Play size={24} fill="currentColor" /> 开始提词
