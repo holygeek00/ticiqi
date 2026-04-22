@@ -141,6 +141,8 @@ function App() {
 
     let stallCount = 0
     let bootRetries = 0
+    let movedOnce = false
+    let bottomReachCount = 0
     const startTimer = () => {
       if (autoScrollTimerRef.current) {
         window.clearInterval(autoScrollTimerRef.current)
@@ -167,14 +169,11 @@ function App() {
           node.scrollTo(0, nextTop)
         }
 
-        if (node.scrollTop >= maxScrollTop - 1) {
-          setIsAutoScrolling(false)
-          return
-        }
+        if (node.scrollTop > prevTop) movedOnce = true
 
         if (node.scrollTop === prevTop) {
           stallCount += 1
-          if (stallCount > 20) {
+          if (stallCount > 35 && !movedOnce) {
             node.scrollTo(0, nextTop + 1)
             if (node.scrollTop === prevTop) {
               setIsAutoScrolling(false)
@@ -183,6 +182,16 @@ function App() {
           }
         } else {
           stallCount = 0
+        }
+
+        if (node.scrollTop >= maxScrollTop - 1) {
+          bottomReachCount += 1
+          // Avoid iOS jitter causing immediate false "reached bottom".
+          if (bottomReachCount > 8) {
+            setIsAutoScrolling(false)
+          }
+        } else {
+          bottomReachCount = 0
         }
       }, 16)
     }
@@ -200,6 +209,22 @@ function App() {
       }
     }
   }, [isAutoScrolling, isEditing, scrollSpeed])
+
+  const handleToggleAutoScroll = () => {
+    if (isAutoScrolling) {
+      setIsAutoScrolling(false)
+      return
+    }
+
+    const node = containerRef.current
+    if (node) {
+      const maxTop = node.scrollHeight - node.clientHeight
+      if (maxTop > 0 && node.scrollTop >= maxTop - 2) {
+        node.scrollTo(0, 0)
+      }
+    }
+    setIsAutoScrolling(true)
+  }
 
   const handleStart = () => {
     if (!text.trim()) {
@@ -429,7 +454,7 @@ function App() {
 
                   <button
                     type="button"
-                    onClick={() => setIsAutoScrolling((v) => !v)}
+                  onClick={handleToggleAutoScroll}
                     className={`state-button ${isAutoScrolling ? 'active-purple' : ''}`}
                     title="自动滚动开关"
                   >
