@@ -83,6 +83,27 @@
   color: #fff;
 }
 
+.ghost-button:disabled,
+.icon-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ghost-button:disabled:hover,
+.icon-button:disabled:hover {
+  background: transparent;
+  color: inherit;
+}
+
+.compact-button {
+  min-height: 2.35rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.42rem 0.7rem;
+  white-space: nowrap;
+}
+
 .editor-textarea {
   width: 100%;
   height: 100%;
@@ -126,6 +147,51 @@
   margin: 0;
   font-size: 0.9rem;
   color: #9ca3af;
+}
+
+.active-card-panel {
+  border: 1px solid #334155;
+  border-radius: 0.9rem;
+  background: rgb(15 23 42 / 72%);
+  padding: 0.75rem 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.active-card-panel > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.active-card-panel span {
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
+.active-card-panel strong {
+  color: #f8fafc;
+  font-size: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-shrink: 0;
+}
+
+.card-switcher > span {
+  width: 4.2rem;
+  color: #cbd5e1;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.9rem;
 }
 
 .md-guide {
@@ -268,9 +334,43 @@
 }
 
 @media (max-width: 720px) {
+  .editor-layout {
+    padding: 0.75rem;
+  }
+
+  .editor-header,
+  .active-card-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .header-actions,
+  .card-switcher {
+    width: 100%;
+  }
+
+  .header-actions .ghost-button,
+  .card-switcher .compact-button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .card-switcher {
+    justify-content: space-between;
+  }
+
   .card-list {
     max-height: 30vh;
     grid-template-columns: 1fr;
+  }
+
+  .tele-card-switcher {
+    max-width: none;
+  }
+
+  .tele-card-readout {
+    min-width: 5.6rem;
+    max-width: 8rem;
   }
 }
 
@@ -374,6 +474,44 @@
 .icon-button:hover {
   color: #fff;
   background: #374151;
+}
+
+.tele-card-switcher {
+  height: 3.4rem;
+  max-width: min(56vw, 25rem);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: #e5e7eb;
+  background: rgb(17 24 39 / 80%);
+  border: 1px solid rgb(55 65 81 / 65%);
+  border-radius: 999px;
+  padding: 0.25rem;
+}
+
+.tele-card-readout {
+  min-width: 7rem;
+  max-width: 14rem;
+  display: grid;
+  gap: 0.05rem;
+  text-align: center;
+}
+
+.tele-card-readout strong,
+.tele-card-readout small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tele-card-readout strong {
+  color: #f8fafc;
+  font-size: 0.95rem;
+}
+
+.tele-card-readout small {
+  color: #cbd5e1;
+  font-size: 0.78rem;
 }
 
 .font-size-readout {

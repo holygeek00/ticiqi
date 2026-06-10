@@ -1,10 +1,22 @@
-import { useEffect, useRef, useState } from 'react'
-import { Edit2, FlipHorizontal, Play, Smartphone, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Edit2,
+  FlipHorizontal,
+  Play,
+  Smartphone,
+  X,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import './App.css'
 
 const DRAFT_KEY = 'teleprompter_draft_v1'
+const CARDS_KEY = 'teleprompter_cards_v1'
+const ACTIVE_CARD_KEY = 'teleprompter_active_card_v1'
 const CARD_LIMIT = 50
 const MD_FORMAT_GUIDE = `# 卡片标题1
 这里是第一段提词内容。
@@ -24,6 +36,8 @@ const MARKDOWN_COMPONENTS = {
   h2: ({ ...props }) => <h4 {...props} />,
   h3: ({ ...props }) => <h4 {...props} />,
 }
+
+const createCardId = (index) => `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`
 
 const getDraftTitle = (content) => {
   const firstLine = content
@@ -49,7 +63,7 @@ const parseMarkdownToCards = (rawMarkdown) => {
       const title = hasMarkdownTitle ? firstLine.slice(2).trim() || `卡片${index + 1}` : getDraftTitle(block)
       const content = hasMarkdownTitle ? lines.slice(1).join('\n').trim() : block
       return {
-        id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`,
+        id: createCardId(index),
         title,
         content: content || block,
         createdAt: Date.now(),
@@ -73,8 +87,31 @@ function App() {
   const [showControls, setShowControls] = useState(true)
   const [isRotated, setIsRotated] = useState(false)
   const [saveStatus, setSaveStatus] = useState('')
-  const [importedCards, setImportedCards] = useState([])
-  const [activeCardId, setActiveCardId] = useState('')
+  const [importedCards, setImportedCards] = useState(() => {
+    try {
+      const storedCards = JSON.parse(localStorage.getItem(CARDS_KEY) ?? '[]')
+      if (!Array.isArray(storedCards)) return []
+
+      return storedCards
+        .filter((card) => card?.content?.trim())
+        .map((card, index) => ({
+          id: card.id || createCardId(index),
+          title: card.title || getDraftTitle(card.content),
+          content: card.content,
+          createdAt: card.createdAt || Date.now(),
+        }))
+        .slice(0, CARD_LIMIT)
+    } catch {
+      return []
+    }
+  })
+  const [activeCardId, setActiveCardId] = useState(() => {
+    try {
+      return localStorage.getItem(ACTIVE_CARD_KEY) ?? ''
+    } catch {
+      return ''
+    }
+  })
   const [editorTab, setEditorTab] = useState('editor')
   const containerRef = useRef(null)
   const markdownInputRef = useRef(null)
@@ -82,15 +119,35 @@ function App() {
   useEffect(() => {
     try {
       localStorage.setItem(DRAFT_KEY, text)
-      if (text.trim()) {
-        setSaveStatus('草稿已自动保存')
-      } else {
-        setSaveStatus('')
-      }
     } catch {
-      setSaveStatus('保存失败：浏览器存储不可用')
+      // localStorage can be unavailable in private browsing or constrained webviews.
     }
   }, [text])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CARDS_KEY, JSON.stringify(importedCards))
+    } catch {
+      // Keep the in-memory cards usable even if persistence fails.
+    }
+  }, [importedCards])
+
+  useEffect(() => {
+    try {
+      if (activeCardId) {
+        localStorage.setItem(ACTIVE_CARD_KEY, activeCardId)
+      } else {
+        localStorage.removeItem(ACTIVE_CARD_KEY)
+      }
+    } catch {
+      // Current card persistence is a convenience, so failure should not block use.
+    }
+  }, [activeCardId])
+
+  const activeCardIndex = importedCards.findIndex((card) => card.id === activeCardId)
+  const activeCard = activeCardIndex >= 0 ? importedCards[activeCardIndex] : null
+  const hasCards = importedCards.length > 0
+  const canMoveCards = importedCards.length > 1
 
   useEffect(() => {
     let timeout
@@ -152,8 +209,75 @@ function App() {
     }
   }
 
+  const handleTextChange = (event) => {
+    const nextText = event.target.value
+    setText(nextText)
+    if (activeCardId) {
+      setImportedCards((cards) =>
+        cards.map((card) => (card.id === activeCardId ? { ...card, content: nextText } : card)),
+      )
+    }
+    setSaveStatus(nextText.trim() ? '草稿已自动保存' : '')
+  }
+
+  const loadCard = useCallback((card, { returnToEditor = true, statusPrefix = '已载入卡片' } = {}) => {
+    setActiveCardId(card.id)
+    setText(card.content)
+    if (returnToEditor) {
+      setEditorTab('editor')
+    }
+    setSaveStatus(`${statusPrefix}：${card.title}`)
+    requestAnimationFrame(() => {
+      if (containerRef.current) {
+        containerRef.current.scrollTop = 0
+      }
+    })
+  }, [])
+
+  const handleStepCard = useCallback((direction) => {
+    if (!canMoveCards) return
+
+    const safeIndex = activeCardIndex >= 0 ? activeCardIndex : direction > 0 ? -1 : 0
+    const nextIndex = (safeIndex + direction + importedCards.length) % importedCards.length
+    loadCard(importedCards[nextIndex], {
+      returnToEditor: false,
+      statusPrefix: direction > 0 ? '已切到下一条' : '已切到上一条',
+    })
+    setShowControls(true)
+  }, [activeCardIndex, canMoveCards, importedCards, loadCard])
+
+  useEffect(() => {
+    if (isEditing || !canMoveCards) return undefined
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        handleStepCard(1)
+      }
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        handleStepCard(-1)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [canMoveCards, handleStepCard, isEditing])
+
   const handlePickMarkdown = () => {
     markdownInputRef.current?.click()
+  }
+
+  const handleBuildCardsFromEditor = () => {
+    const cards = parseMarkdownToCards(text)
+    if (cards.length === 0) {
+      setSaveStatus('请先输入可拆分的文案内容')
+      return
+    }
+
+    setImportedCards(cards)
+    loadCard(cards[0], { statusPrefix: `已生成 ${cards.length} 条文案，已载入` })
   }
 
   const handleImportMarkdown = async (event) => {
@@ -185,10 +309,8 @@ function App() {
         return
       }
       setImportedCards(cards)
-      setActiveCardId(cards[0].id)
-      setText(cards[0].content)
+      loadCard(cards[0], { returnToEditor: false, statusPrefix: `导入成功：${cards.length} 张卡片，已载入` })
       setEditorTab('cards')
-      setSaveStatus(`导入成功：${cards.length} 张卡片`)
     } catch {
       setSaveStatus('导入失败，请重试')
     } finally {
@@ -197,10 +319,7 @@ function App() {
   }
 
   const handleLoadCard = (card) => {
-    setActiveCardId(card.id)
-    setText(card.content)
-    setEditorTab('editor')
-    setSaveStatus(`已载入卡片：${card.title}`)
+    loadCard(card)
   }
 
   return (
@@ -221,6 +340,9 @@ function App() {
               />
               <button type="button" className="ghost-button" onClick={handlePickMarkdown}>
                 导入 MD
+              </button>
+              <button type="button" className="ghost-button" onClick={handleBuildCardsFromEditor}>
+                拆分文案
               </button>
               <button type="button" className="ghost-button" onClick={handleClearDraft}>
                 清空草稿
@@ -253,10 +375,37 @@ function App() {
                     '请在此粘贴或输入您的提词文本...\n\n进入提词模式后，可通过右上角按钮强制横屏显示，横屏时文字会自动铺满屏幕。'
                   }
                   value={text}
-                  onChange={(e) => setText(e.target.value)}
+                  onChange={handleTextChange}
                 />
               </div>
               {saveStatus && <p className="save-status">{saveStatus}</p>}
+              {hasCards && (
+                <div className="active-card-panel">
+                  <div>
+                    <span>当前文案</span>
+                    <strong>{activeCard?.title ?? '未选择文案'}</strong>
+                  </div>
+                  <div className="card-switcher">
+                    <button
+                      type="button"
+                      className="ghost-button compact-button"
+                      onClick={() => handleStepCard(-1)}
+                      disabled={!canMoveCards}
+                    >
+                      <ChevronLeft size={18} /> 上一条
+                    </button>
+                    <span>{activeCardIndex >= 0 ? activeCardIndex + 1 : 0} / {importedCards.length}</span>
+                    <button
+                      type="button"
+                      className="ghost-button compact-button"
+                      onClick={() => handleStepCard(1)}
+                      disabled={!canMoveCards}
+                    >
+                      下一条 <ChevronRight size={18} />
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="md-guide">
                 <strong className="md-guide-title">MD 格式说明（--- 分隔卡片）</strong>
                 <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
@@ -335,6 +484,33 @@ function App() {
                 </div>
 
                 <div className="actions-group">
+                  {hasCards && (
+                    <div className="tele-card-switcher" aria-label="文案切换">
+                      <button
+                        type="button"
+                        onClick={() => handleStepCard(-1)}
+                        className="icon-button"
+                        title="上一条文案"
+                        disabled={!canMoveCards}
+                      >
+                        <ChevronLeft size={24} />
+                      </button>
+                      <span className="tele-card-readout">
+                        <strong>{activeCardIndex >= 0 ? activeCardIndex + 1 : 0}/{importedCards.length}</strong>
+                        <small>{activeCard?.title ?? '未选择文案'}</small>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleStepCard(1)}
+                        className="icon-button"
+                        title="下一条文案"
+                        disabled={!canMoveCards}
+                      >
+                        <ChevronRight size={24} />
+                      </button>
+                    </div>
+                  )}
+
                   <button
                     type="button"
                     onClick={() => setIsRotated(!isRotated)}
