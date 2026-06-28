@@ -17,7 +17,6 @@ import './App.css'
 const DRAFT_KEY = 'teleprompter_draft_v1'
 const CARDS_KEY = 'teleprompter_cards_v1'
 const ACTIVE_CARD_KEY = 'teleprompter_active_card_v1'
-const CARD_LIMIT = 50
 const MD_FORMAT_GUIDE = `# 卡片标题1
 这里是第一段提词内容。
 可以多行。
@@ -70,7 +69,6 @@ const parseMarkdownToCards = (rawMarkdown) => {
       }
     })
     .filter((card) => card.content.trim())
-    .slice(0, CARD_LIMIT)
 }
 
 function App() {
@@ -100,7 +98,6 @@ function App() {
           content: card.content,
           createdAt: card.createdAt || Date.now(),
         }))
-        .slice(0, CARD_LIMIT)
     } catch {
       return []
     }
@@ -417,7 +414,7 @@ function App() {
             <>
               <div className="card-header">
                 <strong>导入卡片</strong>
-                <span>{importedCards.length} / {CARD_LIMIT}</span>
+                <span>{importedCards.length} 条</span>
               </div>
               <div className="card-page-actions">
                 <button type="button" className="ghost-button" onClick={() => setEditorTab('editor')}>
