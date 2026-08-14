@@ -1,17 +1,30 @@
-# React + Vite
+# 简明提词器
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+一个可离线使用的浏览器提词器。支持草稿自动保存、文案库、字号调节、镜像、强制横屏和键盘切换文案。
 
-Currently, two official plugins are available:
+## 文案格式
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+可以直接粘贴带编号的文案，标题会进入文案库，正文会进入提词画面：
 
-## React Compiler
+```md
+### 004｜半天不用全耗在路上
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+这里是口播正文。
+```
 
-## Expanding the ESLint configuration
+连续粘贴多篇 `004｜标题` 格式的内容时会自动拆分。也兼容 `# 标题` 加 `---` 分隔的原格式，以及 `.md`、`.markdown`、`.txt` 文件导入。
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-# ticiqi
+## 本地运行
+
+```bash
+npm install
+npm run dev
+```
+
+## 检查
+
+```bash
+npm test
+npm run lint
+npm run build
+```

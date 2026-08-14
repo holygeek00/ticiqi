@@ -1,34 +1,31 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
-  Edit2,
+  FileText,
   FlipHorizontal,
+  Import,
+  Layers3,
   Play,
   Smartphone,
+  Sparkles,
+  Trash2,
   X,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { getDraftTitle, parseCopyToCards } from './cardParser.js'
 import './App.css'
 
 const DRAFT_KEY = 'teleprompter_draft_v1'
 const CARDS_KEY = 'teleprompter_cards_v1'
 const ACTIVE_CARD_KEY = 'teleprompter_active_card_v1'
-const MD_FORMAT_GUIDE = `# 卡片标题1
-这里是第一段提词内容。
-可以多行。
+const EXAMPLE_COPY = `### 004｜半天不用全耗在路上
 
----
-
-# 卡片标题2
-这里是第二段提词内容。
-
----
-
-没有标题也可以，系统会用首行自动生成标题。`
+看一次墓地，难道一定要专门空出一整天么？从红谷滩过来，正常路况20多分钟，下高速就是园区。到了以后按预算看就行，4800元的单墓、8800元的合墓，还有一万多到三万多的带碑产品。价格不同，样式也不同，现场一排排看，比电话里问得明白。南昌选墓地，来金安福园比个价。`
 
 const MARKDOWN_COMPONENTS = {
   h1: ({ ...props }) => <h4 {...props} />,
@@ -36,39 +33,22 @@ const MARKDOWN_COMPONENTS = {
   h3: ({ ...props }) => <h4 {...props} />,
 }
 
-const createCardId = (index) => `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`
+const readStoredCards = () => {
+  try {
+    const storedCards = JSON.parse(localStorage.getItem(CARDS_KEY) ?? '[]')
+    if (!Array.isArray(storedCards)) return []
 
-const getDraftTitle = (content) => {
-  const firstLine = content
-    .split('\n')
-    .map((line) => line.trim())
-    .find(Boolean)
-  if (!firstLine) return '未命名草稿'
-  return firstLine.slice(0, 24)
-}
-
-const parseMarkdownToCards = (rawMarkdown) => {
-  const normalized = rawMarkdown.replace(/\r\n/g, '\n').trim()
-  if (!normalized) return []
-
-  return normalized
-    .split(/\n-{3,}\n/g)
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((block, index) => {
-      const lines = block.split('\n')
-      const firstLine = lines[0]?.trim() ?? ''
-      const hasMarkdownTitle = firstLine.startsWith('# ')
-      const title = hasMarkdownTitle ? firstLine.slice(2).trim() || `卡片${index + 1}` : getDraftTitle(block)
-      const content = hasMarkdownTitle ? lines.slice(1).join('\n').trim() : block
-      return {
-        id: createCardId(index),
-        title,
-        content: content || block,
-        createdAt: Date.now(),
-      }
-    })
-    .filter((card) => card.content.trim())
+    return storedCards
+      .filter((card) => card?.content?.trim())
+      .map((card, index) => ({
+        id: card.id || `${Date.now()}-${index}`,
+        title: card.title || getDraftTitle(card.content),
+        content: card.content,
+        createdAt: card.createdAt || Date.now(),
+      }))
+  } catch {
+    return []
+  }
 }
 
 function App() {
@@ -84,24 +64,8 @@ function App() {
   const [isMirrored, setIsMirrored] = useState(false)
   const [showControls, setShowControls] = useState(true)
   const [isRotated, setIsRotated] = useState(false)
-  const [saveStatus, setSaveStatus] = useState('')
-  const [importedCards, setImportedCards] = useState(() => {
-    try {
-      const storedCards = JSON.parse(localStorage.getItem(CARDS_KEY) ?? '[]')
-      if (!Array.isArray(storedCards)) return []
-
-      return storedCards
-        .filter((card) => card?.content?.trim())
-        .map((card, index) => ({
-          id: card.id || createCardId(index),
-          title: card.title || getDraftTitle(card.content),
-          content: card.content,
-          createdAt: card.createdAt || Date.now(),
-        }))
-    } catch {
-      return []
-    }
-  })
+  const [saveStatus, setSaveStatus] = useState('草稿会自动保存在本机')
+  const [importedCards, setImportedCards] = useState(readStoredCards)
   const [activeCardId, setActiveCardId] = useState(() => {
     try {
       return localStorage.getItem(ACTIVE_CARD_KEY) ?? ''
@@ -112,12 +76,22 @@ function App() {
   const [editorTab, setEditorTab] = useState('editor')
   const containerRef = useRef(null)
   const markdownInputRef = useRef(null)
+  const textareaRef = useRef(null)
+
+  const draftStats = useMemo(() => {
+    const trimmedText = text.trim()
+    const characters = trimmedText.replace(/\s/g, '').length
+    const estimatedSeconds = Math.max(1, Math.ceil(characters / 4))
+    const parsedCount = trimmedText ? parseCopyToCards(trimmedText).length : 0
+
+    return { characters, estimatedSeconds, parsedCount }
+  }, [text])
 
   useEffect(() => {
     try {
       localStorage.setItem(DRAFT_KEY, text)
     } catch {
-      // localStorage can be unavailable in private browsing or constrained webviews.
+      // Editing must remain available when browser storage is constrained.
     }
   }, [text])
 
@@ -125,7 +99,7 @@ function App() {
     try {
       localStorage.setItem(CARDS_KEY, JSON.stringify(importedCards))
     } catch {
-      // Keep the in-memory cards usable even if persistence fails.
+      // Keep in-memory cards usable if persistence is unavailable.
     }
   }, [importedCards])
 
@@ -137,7 +111,7 @@ function App() {
         localStorage.removeItem(ACTIVE_CARD_KEY)
       }
     } catch {
-      // Current card persistence is a convenience, so failure should not block use.
+      // Active card persistence is a convenience only.
     }
   }, [activeCardId])
 
@@ -158,37 +132,37 @@ function App() {
       }
 
       const scrollContainer = containerRef.current
-
       window.addEventListener('mousemove', showAndReset)
       window.addEventListener('touchstart', showAndReset)
       window.addEventListener('keydown', showAndReset)
-
-      if (scrollContainer) {
-        scrollContainer.addEventListener('scroll', showAndReset)
-      }
-
+      scrollContainer?.addEventListener('scroll', showAndReset)
       timeout = setTimeout(hideControls, 2500)
 
       return () => {
         window.removeEventListener('mousemove', showAndReset)
         window.removeEventListener('touchstart', showAndReset)
         window.removeEventListener('keydown', showAndReset)
-        if (scrollContainer) {
-          scrollContainer.removeEventListener('scroll', showAndReset)
-        }
+        scrollContainer?.removeEventListener('scroll', showAndReset)
         clearTimeout(timeout)
       }
     }
+
     return undefined
   }, [isEditing])
 
   const handleStart = () => {
     if (!text.trim()) {
-      alert('请先输入或粘贴一些文字')
+      setSaveStatus('先粘贴或输入一段文案，再开始提词')
+      setEditorTab('editor')
+      requestAnimationFrame(() => textareaRef.current?.focus())
       return
     }
+
     setIsEditing(false)
     setShowControls(true)
+    requestAnimationFrame(() => {
+      if (containerRef.current) containerRef.current.scrollTop = 0
+    })
   }
 
   const handleExit = () => {
@@ -197,13 +171,24 @@ function App() {
   }
 
   const handleClearDraft = () => {
+    if (text.trim() && !window.confirm('确定清空当前草稿吗？')) return
+
     setText('')
+    setActiveCardId('')
     try {
       localStorage.removeItem(DRAFT_KEY)
       setSaveStatus('草稿已清空')
     } catch {
-      setSaveStatus('清空失败：浏览器存储不可用')
+      setSaveStatus('草稿已清空，但浏览器存储不可用')
     }
+    requestAnimationFrame(() => textareaRef.current?.focus())
+  }
+
+  const handleClearCards = () => {
+    if (!hasCards || !window.confirm(`确定清空 ${importedCards.length} 条文案吗？`)) return
+    setImportedCards([])
+    setActiveCardId('')
+    setSaveStatus('文案库已清空')
   }
 
   const handleTextChange = (event) => {
@@ -214,20 +199,16 @@ function App() {
         cards.map((card) => (card.id === activeCardId ? { ...card, content: nextText } : card)),
       )
     }
-    setSaveStatus(nextText.trim() ? '草稿已自动保存' : '')
+    setSaveStatus(nextText.trim() ? '已自动保存' : '草稿会自动保存在本机')
   }
 
-  const loadCard = useCallback((card, { returnToEditor = true, statusPrefix = '已载入卡片' } = {}) => {
+  const loadCard = useCallback((card, { returnToEditor = true, statusPrefix = '已载入' } = {}) => {
     setActiveCardId(card.id)
     setText(card.content)
-    if (returnToEditor) {
-      setEditorTab('editor')
-    }
-    setSaveStatus(`${statusPrefix}：${card.title}`)
+    if (returnToEditor) setEditorTab('editor')
+    setSaveStatus(`${statusPrefix}「${card.title}」`)
     requestAnimationFrame(() => {
-      if (containerRef.current) {
-        containerRef.current.scrollTop = 0
-      }
+      if (containerRef.current) containerRef.current.scrollTop = 0
     })
   }, [])
 
@@ -238,43 +219,39 @@ function App() {
     const nextIndex = (safeIndex + direction + importedCards.length) % importedCards.length
     loadCard(importedCards[nextIndex], {
       returnToEditor: false,
-      statusPrefix: direction > 0 ? '已切到下一条' : '已切到上一条',
+      statusPrefix: direction > 0 ? '下一条：' : '上一条：',
     })
     setShowControls(true)
   }, [activeCardIndex, canMoveCards, importedCards, loadCard])
 
   useEffect(() => {
-    if (isEditing || !canMoveCards) return undefined
+    if (isEditing) return undefined
 
     const handleKeyDown = (event) => {
-      if (event.key === 'ArrowRight') {
+      if (canMoveCards && event.key === 'ArrowRight') {
         event.preventDefault()
         handleStepCard(1)
       }
-
-      if (event.key === 'ArrowLeft') {
+      if (canMoveCards && event.key === 'ArrowLeft') {
         event.preventDefault()
         handleStepCard(-1)
       }
+      if (event.key === 'Escape') handleExit()
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [canMoveCards, handleStepCard, isEditing])
 
-  const handlePickMarkdown = () => {
-    markdownInputRef.current?.click()
-  }
-
   const handleBuildCardsFromEditor = () => {
-    const cards = parseMarkdownToCards(text)
+    const cards = parseCopyToCards(text)
     if (cards.length === 0) {
-      setSaveStatus('请先输入可拆分的文案内容')
+      setSaveStatus('先输入文案，再整理到文案库')
       return
     }
 
     setImportedCards(cards)
-    loadCard(cards[0], { statusPrefix: `已生成 ${cards.length} 条文案，已载入` })
+    loadCard(cards[0], { statusPrefix: `已整理 ${cards.length} 条文案，并载入` })
   }
 
   const handleImportMarkdown = async (event) => {
@@ -292,21 +269,19 @@ function App() {
       fileType === ''
 
     if (!isSupported) {
-      setSaveStatus('请选择 md/markdown/txt 文本文件')
+      setSaveStatus('请选择 MD、Markdown 或 TXT 文本文件')
       event.target.value = ''
       return
     }
 
     try {
-      const markdownText = await file.text()
-      const cards = parseMarkdownToCards(markdownText)
+      const cards = parseCopyToCards(await file.text())
       if (cards.length === 0) {
-        setSaveStatus('导入失败：内容为空或格式无效')
-        event.target.value = ''
+        setSaveStatus('导入失败：文件内容为空')
         return
       }
       setImportedCards(cards)
-      loadCard(cards[0], { returnToEditor: false, statusPrefix: `导入成功：${cards.length} 张卡片，已载入` })
+      loadCard(cards[0], { returnToEditor: false, statusPrefix: `已导入 ${cards.length} 条文案，并载入` })
       setEditorTab('cards')
     } catch {
       setSaveStatus('导入失败，请重试')
@@ -315,18 +290,26 @@ function App() {
     }
   }
 
-  const handleLoadCard = (card) => {
-    loadCard(card)
+  const handleUseExample = () => {
+    setActiveCardId('')
+    setText(EXAMPLE_COPY)
+    setEditorTab('editor')
+    setSaveStatus('示例已填入，可直接编辑或整理成文案')
+    requestAnimationFrame(() => textareaRef.current?.focus())
   }
 
   return (
     <div className="app">
       {isEditing ? (
-        <div className="editor-layout">
-          <div className="editor-header">
-            <h1 className="editor-title">
-              <Edit2 size={24} /> 提词器文本编辑
-            </h1>
+        <main className="editor-layout">
+          <header className="app-header">
+            <div className="brand">
+              <span className="brand-mark"><FileText size={22} /></span>
+              <div>
+                <h1>简明提词器</h1>
+                <p>粘贴文案，马上开拍</p>
+              </div>
+            </div>
             <div className="header-actions">
               <input
                 ref={markdownInputRef}
@@ -335,199 +318,219 @@ function App() {
                 className="hidden-file-input"
                 onChange={handleImportMarkdown}
               />
-              <button type="button" className="ghost-button" onClick={handlePickMarkdown}>
-                导入 MD
+              <button type="button" className="button button-secondary" onClick={() => markdownInputRef.current?.click()} aria-label="导入文件">
+                <Import size={17} /> <span>导入文件</span>
               </button>
-              <button type="button" className="ghost-button" onClick={handleBuildCardsFromEditor}>
-                拆分文案
-              </button>
-              <button type="button" className="ghost-button" onClick={handleClearDraft}>
-                清空草稿
+              <button type="button" className="button button-quiet" onClick={handleClearDraft} disabled={!text} aria-label="清空草稿">
+                <Trash2 size={17} /> <span>清空</span>
               </button>
             </div>
-          </div>
-          <div className="editor-tabs">
+          </header>
+
+          <nav className="editor-tabs" aria-label="提词器页面">
             <button
               type="button"
               className={`tab-button ${editorTab === 'editor' ? 'tab-button-active' : ''}`}
               onClick={() => setEditorTab('editor')}
             >
-              编辑页
+              <FileText size={17} /> 写文案
             </button>
             <button
               type="button"
               className={`tab-button ${editorTab === 'cards' ? 'tab-button-active' : ''}`}
               onClick={() => setEditorTab('cards')}
             >
-              导入卡片页
+              <Layers3 size={17} /> 文案库
+              {hasCards && <span className="tab-count">{importedCards.length}</span>}
             </button>
-          </div>
+          </nav>
 
           {editorTab === 'editor' ? (
-            <>
-              <div className="editor-body">
+            <div className="editor-workspace">
+              <section className="surface composer-card">
+                <div className="section-heading">
+                  <div>
+                    <span className="eyebrow">当前草稿</span>
+                    <h2>{activeCard?.title ?? '输入你的口播文案'}</h2>
+                  </div>
+                  <span className="saved-state"><Check size={15} /> {saveStatus}</span>
+                </div>
+
                 <textarea
+                  ref={textareaRef}
                   className="editor-textarea"
-                  placeholder={
-                    '请在此粘贴或输入您的提词文本...\n\n进入提词模式后，可通过右上角按钮强制横屏显示，横屏时文字会自动铺满屏幕。'
-                  }
+                  aria-label="提词文案"
+                  placeholder={'粘贴或输入文案…\n\n支持：004｜文案标题\n也支持：### 004｜文案标题'}
                   value={text}
                   onChange={handleTextChange}
+                  spellCheck="false"
                 />
-              </div>
-              {saveStatus && <p className="save-status">{saveStatus}</p>}
-              {hasCards && (
-                <div className="active-card-panel">
-                  <div>
-                    <span>当前文案</span>
-                    <strong>{activeCard?.title ?? '未选择文案'}</strong>
+
+                <div className="composer-footer">
+                  <div className="draft-meta" aria-label="文案统计">
+                    <span>{draftStats.characters} 字</span>
+                    <i />
+                    <span>约 {draftStats.estimatedSeconds} 秒</span>
+                    <i />
+                    <span>可整理为 {draftStats.parsedCount} 条</span>
                   </div>
-                  <div className="card-switcher">
-                    <button
-                      type="button"
-                      className="ghost-button compact-button"
-                      onClick={() => handleStepCard(-1)}
-                      disabled={!canMoveCards}
-                    >
-                      <ChevronLeft size={18} /> 上一条
-                    </button>
-                    <span>{activeCardIndex >= 0 ? activeCardIndex + 1 : 0} / {importedCards.length}</span>
-                    <button
-                      type="button"
-                      className="ghost-button compact-button"
-                      onClick={() => handleStepCard(1)}
-                      disabled={!canMoveCards}
-                    >
-                      下一条 <ChevronRight size={18} />
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    className="button button-secondary organize-button"
+                    onClick={handleBuildCardsFromEditor}
+                    disabled={!text.trim()}
+                  >
+                    <Sparkles size={17} /> 整理到文案库
+                  </button>
                 </div>
-              )}
-              <div className="md-guide">
-                <strong className="md-guide-title">MD 格式说明（--- 分隔卡片）</strong>
-                <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
-                  {MD_FORMAT_GUIDE}
-                </ReactMarkdown>
-              </div>
-            </>
+              </section>
+
+              <aside className="editor-sidebar">
+                <section className="surface start-card">
+                  <span className="eyebrow">准备好了</span>
+                  <h2>开始顺畅提词</h2>
+                  <p>进入全屏后可调字号、镜像和横屏，左右方向键切换文案。</p>
+                  <button type="button" onClick={handleStart} className="start-button">
+                    <Play size={20} fill="currentColor" /> 开始提词
+                  </button>
+                </section>
+
+                {hasCards && (
+                  <section className="surface current-card-panel">
+                    <div className="current-card-copy">
+                      <span className="eyebrow">文案库</span>
+                      <strong>{activeCard?.title ?? '尚未选择文案'}</strong>
+                    </div>
+                    <div className="card-switcher">
+                      <button type="button" className="round-button" onClick={() => handleStepCard(-1)} disabled={!canMoveCards} aria-label="上一条文案">
+                        <ChevronLeft size={19} />
+                      </button>
+                      <span>{activeCardIndex >= 0 ? activeCardIndex + 1 : 0} / {importedCards.length}</span>
+                      <button type="button" className="round-button" onClick={() => handleStepCard(1)} disabled={!canMoveCards} aria-label="下一条文案">
+                        <ChevronRight size={19} />
+                      </button>
+                    </div>
+                  </section>
+                )}
+
+                <section className="surface format-card">
+                  <div className="format-heading">
+                    <div>
+                      <span className="eyebrow">支持你的格式</span>
+                      <h3>编号标题会自动识别</h3>
+                    </div>
+                    <span className="format-badge">新</span>
+                  </div>
+                  <pre>### 004｜半天不用全耗在路上{`\n\n`}正文从这里开始…</pre>
+                  <p>连续粘贴多篇编号文案，也能自动拆分；原有的 <code># 标题</code> 和 <code>---</code> 分隔仍然支持。</p>
+                  <button type="button" className="text-button" onClick={handleUseExample}>填入示例看看 <ChevronRight size={16} /></button>
+                </section>
+              </aside>
+            </div>
           ) : (
-            <>
-              <div className="card-header">
-                <strong>导入卡片</strong>
-                <span>{importedCards.length} 条</span>
+            <section className="surface library-page">
+              <div className="library-header">
+                <div>
+                  <span className="eyebrow">文案库</span>
+                  <h2>{importedCards.length ? `${importedCards.length} 条可提词文案` : '还没有整理文案'}</h2>
+                  <p>点击任意文案即可载入编辑，也可以直接开始提词。</p>
+                </div>
+                <div className="library-actions">
+                  <button type="button" className="button button-secondary" onClick={() => markdownInputRef.current?.click()}>
+                    <Import size={17} /> 导入文件
+                  </button>
+                  {hasCards && (
+                    <button type="button" className="button button-quiet danger-button" onClick={handleClearCards}>
+                      <Trash2 size={17} /> 清空文案库
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="card-page-actions">
-                <button type="button" className="ghost-button" onClick={() => setEditorTab('editor')}>
-                  返回编辑页
-                </button>
-              </div>
-              <div className="card-list card-page-list">
-                {importedCards.length === 0 ? (
-                  <p className="card-empty">还没有导入卡片，点击“导入 MD”开始。</p>
+
+              <div className="card-list">
+                {!hasCards ? (
+                  <div className="card-empty">
+                    <span><Layers3 size={26} /></span>
+                    <strong>从一段文案开始</strong>
+                    <p>回到“写文案”粘贴内容，再点“整理到文案库”。</p>
+                    <button type="button" className="button button-primary" onClick={() => setEditorTab('editor')}>去写文案</button>
+                  </div>
                 ) : (
-                  importedCards.map((card) => (
+                  importedCards.map((card, index) => (
                     <button
                       key={card.id}
                       type="button"
                       className={`card-item ${activeCardId === card.id ? 'card-item-active' : ''}`}
-                      onClick={() => handleLoadCard(card)}
+                      onClick={() => loadCard(card)}
                     >
-                      <strong className="card-title">{card.title}</strong>
-                      <span>{new Date(card.createdAt).toLocaleString()}</span>
-                      <div className="card-markdown">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
-                          {card.content}
-                        </ReactMarkdown>
+                      <span className="card-number">{String(index + 1).padStart(2, '0')}</span>
+                      <div className="card-item-body">
+                        <strong className="card-title">{card.title}</strong>
+                        <div className="card-markdown">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+                            {card.content}
+                          </ReactMarkdown>
+                        </div>
                       </div>
+                      <ChevronRight className="card-chevron" size={20} />
                     </button>
                   ))
                 )}
               </div>
-            </>
-          )}
 
-          <button onClick={handleStart} className="start-button">
-            <Play size={24} fill="currentColor" /> 开始提词
-          </button>
-        </div>
+              {hasCards && (
+                <div className="library-footer">
+                  <span>{activeCard ? `已选：${activeCard.title}` : '选择一条文案开始'}</span>
+                  <button type="button" onClick={handleStart} className="start-button start-button-inline">
+                    <Play size={19} fill="currentColor" /> 开始提词
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
+        </main>
       ) : (
         <div className="teleprompter-shell">
-          <div
-            className={`teleprompter-stage ${isRotated ? 'force-landscape' : ''}`}
-          >
+          <div className={`teleprompter-stage ${isRotated ? 'force-landscape' : ''}`}>
             <div
               className={`controls-bar ${showControls ? 'controls-visible' : 'controls-hidden'}`}
               style={{ paddingInline: isRotated ? '3rem' : '1rem' }}
             >
               <div className="controls-inner">
-                <div className="pill-group">
-                  <button
-                    type="button"
-                    onClick={() => setFontSize((f) => Math.max(20, f - 4))}
-                    className="icon-button"
-                    title="缩小字体"
-                  >
-                    <ZoomOut size={24} />
+                <div className="tele-control-pill" aria-label="字号">
+                  <button type="button" onClick={() => setFontSize((size) => Math.max(20, size - 4))} className="icon-button" aria-label="缩小字体">
+                    <ZoomOut size={23} />
                   </button>
                   <span className="font-size-readout">{fontSize}</span>
-                  <button
-                    type="button"
-                    onClick={() => setFontSize((f) => Math.min(250, f + 4))}
-                    className="icon-button"
-                    title="放大字体"
-                  >
-                    <ZoomIn size={24} />
+                  <button type="button" onClick={() => setFontSize((size) => Math.min(250, size + 4))} className="icon-button" aria-label="放大字体">
+                    <ZoomIn size={23} />
                   </button>
                 </div>
 
                 <div className="actions-group">
                   {hasCards && (
                     <div className="tele-card-switcher" aria-label="文案切换">
-                      <button
-                        type="button"
-                        onClick={() => handleStepCard(-1)}
-                        className="icon-button"
-                        title="上一条文案"
-                        disabled={!canMoveCards}
-                      >
-                        <ChevronLeft size={24} />
+                      <button type="button" onClick={() => handleStepCard(-1)} className="icon-button" aria-label="上一条文案" disabled={!canMoveCards}>
+                        <ChevronLeft size={23} />
                       </button>
                       <span className="tele-card-readout">
                         <strong>{activeCardIndex >= 0 ? activeCardIndex + 1 : 0}/{importedCards.length}</strong>
-                        <small>{activeCard?.title ?? '未选择文案'}</small>
+                        <small>{activeCard?.title ?? '当前草稿'}</small>
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => handleStepCard(1)}
-                        className="icon-button"
-                        title="下一条文案"
-                        disabled={!canMoveCards}
-                      >
-                        <ChevronRight size={24} />
+                      <button type="button" onClick={() => handleStepCard(1)} className="icon-button" aria-label="下一条文案" disabled={!canMoveCards}>
+                        <ChevronRight size={23} />
                       </button>
                     </div>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={() => setIsRotated(!isRotated)}
-                    className={`state-button ${isRotated ? 'active-green' : ''}`}
-                    title="强制横屏/竖屏"
-                  >
-                    <Smartphone size={24} className={isRotated ? '' : 'rotated-90'} />
+                  <button type="button" onClick={() => setIsRotated(!isRotated)} className={`state-button ${isRotated ? 'state-button-active' : ''}`} aria-label="切换横竖屏">
+                    <Smartphone size={22} className={isRotated ? '' : 'rotated-90'} />
                   </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsMirrored(!isMirrored)}
-                    className={`state-button ${isMirrored ? 'active-blue' : ''}`}
-                    title="镜像反转"
-                  >
-                    <FlipHorizontal size={24} />
+                  <button type="button" onClick={() => setIsMirrored(!isMirrored)} className={`state-button ${isMirrored ? 'state-button-active' : ''}`} aria-label="镜像反转">
+                    <FlipHorizontal size={22} />
                   </button>
-
-                  <button type="button" onClick={handleExit} className="exit-button" title="退出提词">
-                    <X size={24} />
+                  <button type="button" onClick={handleExit} className="exit-button" aria-label="退出提词">
+                    <X size={23} />
                   </button>
                 </div>
               </div>
@@ -544,7 +547,7 @@ function App() {
                   fontSize: `${fontSize}px`,
                   transform: isMirrored ? 'scaleX(-1)' : 'none',
                   width: isRotated ? '95%' : '90%',
-                  maxWidth: isRotated ? 'none' : '800px',
+                  maxWidth: isRotated ? 'none' : '900px',
                 }}
               >
                 {text}
