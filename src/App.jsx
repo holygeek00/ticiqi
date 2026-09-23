@@ -18,6 +18,10 @@ import {
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { getDraftTitle, parseCopyToCards } from './cardParser.js'
+import {
+  getNavigationDirectionFromKey,
+  getNavigationDirectionFromSwipe,
+} from './copyNavigation.js'
 import './App.css'
 
 const DRAFT_KEY = 'teleprompter_draft_v1'
@@ -64,6 +68,7 @@ function App() {
   const [isMirrored, setIsMirrored] = useState(false)
   const [showControls, setShowControls] = useState(true)
   const [isRotated, setIsRotated] = useState(false)
+  const [copyTransition, setCopyTransition] = useState({ direction: 'next', key: 0 })
   const [saveStatus, setSaveStatus] = useState('草稿会自动保存在本机')
   const [importedCards, setImportedCards] = useState(readStoredCards)
   const [activeCardId, setActiveCardId] = useState(() => {
@@ -75,6 +80,7 @@ function App() {
   })
   const [editorTab, setEditorTab] = useState('editor')
   const containerRef = useRef(null)
+  const swipeStartRef = useRef(null)
   const markdownInputRef = useRef(null)
   const textareaRef = useRef(null)
 
@@ -217,6 +223,10 @@ function App() {
 
     const safeIndex = activeCardIndex >= 0 ? activeCardIndex : direction > 0 ? -1 : 0
     const nextIndex = (safeIndex + direction + importedCards.length) % importedCards.length
+    setCopyTransition((transition) => ({
+      direction: direction > 0 ? 'next' : 'previous',
+      key: transition.key + 1,
+    }))
     loadCard(importedCards[nextIndex], {
       returnToEditor: false,
       statusPrefix: direction > 0 ? '下一条：' : '上一条：',
@@ -224,23 +234,56 @@ function App() {
     setShowControls(true)
   }, [activeCardIndex, canMoveCards, importedCards, loadCard])
 
+  const handleSwipeStart = (event) => {
+    if (event.pointerType !== 'touch' || event.target.closest('button, .controls-bar')) return
+    swipeStartRef.current = { x: event.clientX, y: event.clientY }
+  }
+
+  const handleSwipeEnd = (event) => {
+    if (event.pointerType !== 'touch') return
+
+    const direction = getNavigationDirectionFromSwipe(
+      swipeStartRef.current,
+      { x: event.clientX, y: event.clientY },
+    )
+    swipeStartRef.current = null
+    if (direction) handleStepCard(direction)
+  }
+
   useEffect(() => {
     if (isEditing) return undefined
 
     const handleKeyDown = (event) => {
-      if (canMoveCards && event.key === 'ArrowRight') {
+      const direction = getNavigationDirectionFromKey(event)
+      if (canMoveCards && direction) {
         event.preventDefault()
-        handleStepCard(1)
-      }
-      if (canMoveCards && event.key === 'ArrowLeft') {
-        event.preventDefault()
-        handleStepCard(-1)
+        handleStepCard(direction)
       }
       if (event.key === 'Escape') handleExit()
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [canMoveCards, handleStepCard, isEditing])
+
+  useEffect(() => {
+    if (isEditing || !canMoveCards || !('mediaSession' in navigator)) return undefined
+
+    const setMediaAction = (action, handler) => {
+      try {
+        navigator.mediaSession.setActionHandler(action, handler)
+      } catch {
+        // Some browsers expose Media Session but not every action.
+      }
+    }
+
+    setMediaAction('nexttrack', () => handleStepCard(1))
+    setMediaAction('previoustrack', () => handleStepCard(-1))
+
+    return () => {
+      setMediaAction('nexttrack', null)
+      setMediaAction('previoustrack', null)
+    }
   }, [canMoveCards, handleStepCard, isEditing])
 
   const handleBuildCardsFromEditor = () => {
@@ -389,7 +432,7 @@ function App() {
                 <section className="surface start-card">
                   <span className="eyebrow">准备好了</span>
                   <h2>开始顺畅提词</h2>
-                  <p>进入全屏后可调字号、镜像和横屏，左右方向键切换文案。</p>
+                  <p>进入提词后左右滑动即可切换整条文案，也支持常见蓝牙翻页器。</p>
                   <button type="button" onClick={handleStart} className="start-button">
                     <Play size={20} fill="currentColor" /> 开始提词
                   </button>
@@ -491,7 +534,12 @@ function App() {
         </main>
       ) : (
         <div className="teleprompter-shell">
-          <div className={`teleprompter-stage ${isRotated ? 'force-landscape' : ''}`}>
+          <div
+            className={`teleprompter-stage ${isRotated ? 'force-landscape' : ''}`}
+            onPointerDown={handleSwipeStart}
+            onPointerUp={handleSwipeEnd}
+            onPointerCancel={() => { swipeStartRef.current = null }}
+          >
             <div
               className={`controls-bar ${showControls ? 'controls-visible' : 'controls-hidden'}`}
               style={{ paddingInline: isRotated ? '3rem' : '1rem' }}
@@ -542,15 +590,22 @@ function App() {
               style={{ paddingTop: isRotated ? '20vw' : '30vh', paddingBottom: isRotated ? '36vw' : '50vh' }}
             >
               <div
-                className="teleprompter-text"
+                key={copyTransition.key}
+                className={`teleprompter-copy-transition teleprompter-copy-${copyTransition.direction}`}
                 style={{
-                  fontSize: `${fontSize}px`,
-                  transform: isMirrored ? 'scaleX(-1)' : 'none',
                   width: isRotated ? '95%' : '90%',
                   maxWidth: isRotated ? 'none' : '900px',
                 }}
               >
-                {text}
+                <div
+                  className="teleprompter-text"
+                  style={{
+                    fontSize: `${fontSize}px`,
+                    transform: isMirrored ? 'scaleX(-1)' : 'none',
+                  }}
+                >
+                  {text}
+                </div>
               </div>
             </div>
           </div>
